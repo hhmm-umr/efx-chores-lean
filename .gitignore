@@ -1,0 +1,9 @@
+/.lake/
+/lake-manifest.json.bak
+*.olean
+*.ilean
+*.trace
+*.log
+__pycache__/
+*.pyc
+.DS_Store

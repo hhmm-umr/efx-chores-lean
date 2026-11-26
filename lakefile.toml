@@ -1,0 +1,17 @@
+name = "BivaluedChoresEFX"
+version = "0.1.0"
+keywords = ["math", "fair-division", "efx", "chores"]
+defaultTargets = ["BivaluedChoresEFX"]
+
+[leanOptions]
+pp.unicode.fun = true
+autoImplicit = false
+relaxedAutoImplicit = false
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.36.0"
+
+[[lean_lib]]
+name = "BivaluedChoresEFX"
