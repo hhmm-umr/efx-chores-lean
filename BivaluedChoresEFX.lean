@@ -11,24 +11,22 @@ public import BivaluedChoresEFX.ThreeAgentTypes
 /-!
 # BivaluedChoresEFX
 
-Formalization in Lean 4 + Mathlib of exact EFX existence theorems for additive chores:
-* **Theorem B (`BivaluedChoresEFX.exists_efx_ratio_le_two`, `exists_efx_bivalued_ratio_le_two`)**:
-  Exact EFX allocations always exist for arbitrary `n ≥ 1`, `m ≥ 0`, arbitrary agent types,
-  and arbitrary personalized continuous/multi-valued additive costs `c i g ∈ [p i, 2 * p i]`
-  (`0 < p i`) via Partial-Round-First Round-Robin (`PRFRR`).
-* **Theorem C2 (`BivaluedChoresEFX.exists_efx_three_agent_types_bivalued`)**:
-  Exact EFX allocations always exist for arbitrary `n ≥ 1`, `m ≥ 0`, three agent types with
-  arbitrary personalized bi-valued costs `{p b, q b}` (`0 < p b ≤ q b`, unrestricted ratios),
-  and all-large (`A`), unique-light (`B_0, B_1, B_2`), and all-small (`D`) chores via 2D discrete
-  Sperner's Lemma (`BivaluedChoresEFX.sperner_2d`) and Chain/Star Bridges.
-* **Theorem 1 (`BivaluedChoresEFX.exists_efx_two_agent_types_bivalued`)**:
-  Exact EFX allocations always exist for arbitrary `n ≥ 1`, `m ≥ 0`, and personalized bi-valued
-  additive chores with two types of agents (`v b g ∈ {p b, q b}`, `0 < p b ≤ q b`).
-* **Identical Bi-Valued Agents (`BivaluedChoresEFX.exists_efx_identical_bivalued_norm`)**:
-  Closed-form water-filling EFX allocation for any `n ≥ 1` identical bi-valued agents.
-* **General-`n` Reductions (arbitrary agent types)**:
-  * Modulo-`n` All-Large Reduction (`BivaluedChoresEFX.efx_add_all_large_round`)
-  * All-Small Chore Insertion Lemma via acyclic most-envy graphs
-    (`BivaluedChoresEFX.exists_efx_insert_all_small`,
-     `BivaluedChoresEFX.exists_efx_extend_all_small`)
+A complete allocation assigns every indivisible chore to one agent. For each observer `i`,
+EFX bounds the cost of her own bundle after removing any one chore by her cost for every
+comparison bundle. The existence results allow `n ≥ 1` agents and `m ≥ 0` chores.
+
+* `exists_efx_of_cost_le_sum_of_two` applies partial-round-first round-robin when costs are
+  nonnegative and, for each agent, any two distinct chores together cost at least as much
+  as any one. Theorem B (`exists_efx_ratio_le_two`) specializes this to each agent's own
+  interval `[p i, 2 * p i]` with `p i > 0`. Its bi-valued corollary is
+  `exists_efx_bivalued_ratio_le_two`.
+* Theorem 1 (`exists_efx_two_agent_types_bivalued`) allows two type labels and arbitrary
+  bi-valued cost profiles within each type, with `0 < p b ≤ q b`.
+* Theorem C2 (`exists_efx_three_agent_types_bivalued`) allows three type labels with the
+  same cost bounds when each chore has cost `p b` for zero, one, or all three types.
+  Its proof uses `sperner_2d` and the single-item, chain, and star bridges.
+* `exists_efx_identical_bivalued_norm` realizes the closed-form counts for identical agents.
+  `efx_add_all_large_round` extends an EFX allocation by one maximal-cost chore per agent.
+  `exists_efx_insert_all_small` and `exists_efx_extend_all_small` insert minimum-cost chores
+  using a rotation of cheapest bundles.
 -/

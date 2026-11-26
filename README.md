@@ -1,28 +1,46 @@
-# Exact EFX Existence for Personalized Bi-Valued & Bounded-Ratio Additive Chores
+# Exact EFX for personalized bi-valued and bounded-cost additive chores
 
-A complete, constructive mathematical suite and **zero-`sorry`, zero-warning Lean 4 (`v4.36.0`) + Mathlib4 formalization** (7,184 lines across 8 Lean files, standard axioms only) establishing **exact envy-free up to any chore (EFX)** existence across four general-$n$ regimes left open by Wentao He & Biaoshuai Tao (*"EFX for Additive Chores: Nonexistence, Pareto Incompatibility, and Bi-Valued Existence"*, `arXiv:2606.08872v2`, accepted to SODA '27).
+This Lean 4 formalization gives three existence results for any number of agents $n\ge 1$ and any number of indivisible chores $m\ge 0$. A complete allocation assigns every chore to exactly one agent. It is **envy-free up to any chore (EFX)** if, for every pair $i,j$ and every chore $g$ assigned to $i$,
 
-## Main Formalized Theorems
+$$c_i(X_i\setminus\{g\})\le c_i(X_j).$$
 
-### 1. Theorem B — Arbitrary $n$, Arbitrary Agent Types, Personalized Bounded-Ratio Chores $[p_i, 2p_i]$ (`RatioTwoChores.lean`)
+Both bundles are evaluated by agent $i$, and bundle costs are additive. An agent **type** specifies a full cost profile across chores. A type can contain any number of agents.
+
+| Result | Agent types | Restriction on costs |
+|---|---|---|
+| PRFRR, including Theorem B | Arbitrary | For each agent, costs are nonnegative and the largest cost is at most the sum of the two smallest when $m\ge 2$. This includes all costs in a personal interval $[p_i,2p_i]$ with $p_i>0$. |
+| Theorem 1 | At most two | Each type $b$ has its own values $0<p_b\le q_b$. All four light/heavy patterns are allowed. |
+| Theorem C2 | Three type labels | Each type has its own values $0<p_b\le q_b$. Each chore is light for zero, one, or all three types. |
+
+The supporting results include closed-form bundle sizes for identical agents and two ways to extend an existing EFX allocation. The proof guide works through the round-robin comparison and the exchange at a two-type crossing. [Proof guide](PROOF.md)
+
+## Main formalized theorems
+
+### Theorem B and its extension to sums of two chore costs
 
 ```lean
-theorem BivaluedChoresEFX.exists_efx_ratio_le_two
+theorem exists_efx_ratio_le_two
     {n m : ℕ} (hn : 0 < n)
     (cost : Fin n → Fin m → ℝ)
-    (p : Fin n → ℝ) (hp : ∀ i, 0 < p i)
+    (p : Fin n → ℝ)
+    (hp : ∀ i, 0 < p i)
     (hlo : ∀ i g, p i ≤ cost i g)
     (hhi : ∀ i g, cost i g ≤ 2 * p i) :
     ∃ alloc : Fin m → Fin n, IsEFX cost alloc
 ```
 
-- Holds for **every** $n \ge 1$, **every** $m \ge 0$, **unlimited agent types**, **all $2^n$ chore types**, and **arbitrary continuous / multi-valued** personalized additive costs $c_i(g) \in [p_i, 2 p_i]$ (in particular, all personalized bi-valued instances with $q_i / p_i \le 2$, formalized directly as `exists_efx_bivalued_ratio_le_two`).
-- Proved constructively via **Partial-Round-First Round-Robin (`PRFRR`)**: execute the partial round of size $m \bmod n$ *first*, then run $\lfloor m / n \rfloor$ full rounds in the same agent order.
+In partial-round-first round-robin (PRFRR), the first $m\bmod n$ agents each pick a cheapest remaining chore. All agents then pick in the same order for $\lfloor m/n\rfloor$ full rounds. The stronger theorem uses the following hypothesis for each agent $i$ and all chores $g,a,b$.
 
-### 2. Theorem C2 — Arbitrary $n$, Three Agent Types, Arbitrary Personalized Ratios $r_b > 1$ (`Sperner2D.lean`, `ThreeAgentTypes.lean`)
+$$a\ne b \quad\Longrightarrow\quad c_i(g)\le c_i(a)+c_i(b).$$
+
+Here $a,b$ are distinct chores, and their costs may tie. For $m\ge 2$ it suffices to compare the maximum with the sum of the two smallest entries in that agent's row, counting multiplicities. For $m\le 1$ the pair condition is vacuous. The row $(1,2,2,3)$ satisfies the condition and has maximum-to-minimum ratio $3$. The general theorem is `exists_efx_of_cost_le_sum_of_two`. The interval theorem above and `exists_efx_bivalued_ratio_le_two` follow directly. [Round-robin proofs](BivaluedChoresEFX/RatioTwoChores.lean)
+
+He and Tao already give an arbitrary-$n$ algorithm for the common two-value set $\{1,r\}$ with $r\le 2$ in Section 5 of their paper. Their partial first round takes its agents in reverse order. Theorem B uses a forward partial round and allows every real cost in each agent's personal interval. [He and Tao, Section 5](https://arxiv.org/html/2606.08872v2#S5)
+
+### Theorem C2 for three type labels
 
 ```lean
-theorem BivaluedChoresEFX.exists_efx_three_agent_types_bivalued
+theorem exists_efx_three_agent_types_bivalued
     {n m : ℕ} (hn : 0 < n)
     (cost : Fin n → Fin m → ℝ)
     (cls : Fin n → Fin 3)
@@ -38,13 +56,12 @@ theorem BivaluedChoresEFX.exists_efx_three_agent_types_bivalued
     ∃ alloc : Fin m → Fin n, IsEFX cost alloc
 ```
 
-- Holds for **every** $n = t_0 + t_1 + t_2 \ge 1$, **every** $m \ge 0$, **three agent types** with **completely unrestricted personalized ratios** $r_b = q_b / p_b > 1$, and all-large ($A$), unique-light ($B_0, B_1, B_2$), and all-small ($D$) chores.
-- Proved via **Unified Total-Chore Simplex $\Sigma$**, **Conservative Envy $\widehat{E}_b$** (giving automatic Sperner boundary conditions without boundary walks), a self-contained **`ZMod 2` 2D Discrete Sperner's Lemma (`sperner_2d`)**, exact rainbow-triangle extraction, **Subcase 4a (`threeTypeSpec_of_subcase4a`)**, and **Subcase 4b Chain/Star Bridges (`threeTypeSpec_chain_bridge`, `threeTypeSpec_star_bridge`)**.
+A chore is light for type $b$ exactly when its cost equals $p_b$. The permitted sets of light types are $\varnothing$, $\{0\}$, $\{1\}$, $\{2\}$, and $\{0,1,2\}$. The theorem includes empty types, constant profiles ($q_b=p_b$), and unbounded personalized ratios $q_b/p_b$. Its proof uses the two-dimensional discrete Sperner lemma, then resolves the rainbow triangle by a single-item, chain, or star bridge. [Three-type proof](BivaluedChoresEFX/ThreeAgentTypes.lean) · [Sperner lemma](BivaluedChoresEFX/Sperner2D.lean)
 
-### 3. Theorem 1 — Arbitrary $n$, Two Agent Types, Full Personalized Bi-Valued Chores (`TwoAgentTypes.lean`)
+### Theorem 1 for two agent types
 
 ```lean
-theorem BivaluedChoresEFX.exists_efx_two_agent_types_bivalued
+theorem exists_efx_two_agent_types_bivalued
     {n m : ℕ} (hn : 0 < n)
     (cost : Fin n → Fin m → ℝ)
     (cls : Fin n → Bool)
@@ -56,52 +73,54 @@ theorem BivaluedChoresEFX.exists_efx_two_agent_types_bivalued
     ∃ alloc : Fin m → Fin n, IsEFX cost alloc
 ```
 
-- Resolves the full unrestricted 2-agent-type bi-valued regime (all 4 chore types $A, B, C, D$, arbitrary $n \ge 1$, arbitrary personalized ratios $r_1, r_2 > 1$) via closed-form water-filling (`IdenticalAgents.lean`), a 3-phase Discrete Bolzano Walk, and a Single-Item Jump Bridge — delineating the exact bi-valued vs. tri-valued phase transition against He & Tao (2026).
+There is no restriction on which types find a given chore light. The proof balances bundles within each type, follows a discrete path between the two piles, and exchanges a chore across piles when the envy inequalities change at consecutive states. He and Tao's three-value counterexamples also use only two agent types, for every $n\ge4$. Their four-agent bi-valued existence theorem uses a common pair of costs across the agents. [Two-type proof](BivaluedChoresEFX/TwoAgentTypes.lean) · [He and Tao, Sections 3–5](https://arxiv.org/html/2606.08872v2#S3)
 
-### 4. General-$n$ Reductions & Identical-Agent Water-Filling (`Reductions.lean`, `IdenticalAgents.lean`)
+## Reductions and identical agents
 
-1. **Modulo-$n$ All-Large Chore Reduction** (`BivaluedChoresEFX.efx_add_all_large_round`): Adding $n$ all-large chores preserves EFX for arbitrary $n$ and arbitrary additive costs.
-2. **All-Small Chore Insertion Lemma** (`BivaluedChoresEFX.exists_efx_insert_all_small`, `BivaluedChoresEFX.exists_efx_extend_all_small`): Arbitrary numbers of all-small chores can be inserted while preserving EFX via acyclic most-envy DAG sinks of minimum-social-cost EFX allocations.
-3. **Closed-Form Identical Bi-Valued EFX** (`BivaluedChoresEFX.exists_efx_identical_bivalued_norm`): Explicit water-filling EFX allocation `IdenticalEFX` for arbitrary $n \ge 1$ identical bi-valued agents.
+For nonnegative additive costs, `efx_add_all_large_round` assigns one new chore to each agent when all new chores attain each observer's maximum cost. This reduces the number of such chores to consider modulo $n$. For a chore of minimum cost to every agent, `exists_efx_insert_all_small` finds an EFX allocation with an envy-free recipient by rotating old bundles on one cycle of cheapest-bundle choices. `exists_efx_extend_all_small` repeats the insertion. [Reductions](BivaluedChoresEFX/Reductions.lean)
 
-## Repository Structure
+For identical agents with normalized costs $\{1,r\}$ and $r>1$, `pileLarge` and `pileSmall` give the counts in each bundle. `exists_efx_identical_bivalued_norm` realizes those counts as a complete allocation. [Water-filling formulas](BivaluedChoresEFX/IdenticalAgents.lean) · [Realization theorem](BivaluedChoresEFX/TwoAgentTypes.lean)
 
-| File | Lines | Contents |
-|---|---:|---|
-| [BivaluedChoresEFX.lean](BivaluedChoresEFX.lean) | 34 | Root module re-exporting all 7 modules |
-| [BivaluedChoresEFX/Basic.lean](BivaluedChoresEFX/Basic.lean) | 222 | `bundle`, `bundleCost`, `IsEFX`, scaling/reindexing invariance, `exists_assignment_with_counts` |
-| [BivaluedChoresEFX/Reductions.lean](BivaluedChoresEFX/Reductions.lean) | 483 | `efx_add_all_large_round`, acyclic most-envy DAG sink, `exists_efx_insert_all_small`, `exists_efx_extend_all_small` |
-| [BivaluedChoresEFX/IdenticalAgents.lean](BivaluedChoresEFX/IdenticalAgents.lean) | 1750 | `IdenticalEFX`, internal EFX, Fundamental Bound, Lemmas A/B/C, `phase1_bundle_lower_bound` |
-| [BivaluedChoresEFX/TwoAgentTypes.lean](BivaluedChoresEFX/TwoAgentTypes.lean) | 949 | `discrete_bolzano`, `TwoTypeSpec`, Phase 1/2/3 + Bridge, `exists_efx_identical_bivalued_norm`, `exists_efx_two_agent_types_bivalued` |
-| [BivaluedChoresEFX/RatioTwoChores.lean](BivaluedChoresEFX/RatioTwoChores.lean) | 524 | Partial-Round-First Round-Robin (`PRFRR`), `exists_efx_ratio_le_two`, `exists_efx_bivalued_ratio_le_two` |
-| [BivaluedChoresEFX/Sperner2D.lean](BivaluedChoresEFX/Sperner2D.lean) | 269 | Self-contained `ZMod 2` proof of 2D Discrete Sperner's Lemma (`sperner_2d`) |
-| [BivaluedChoresEFX/ThreeAgentTypes.lean](BivaluedChoresEFX/ThreeAgentTypes.lean) | 2953 | `pileTau_mono_p`, `tildeTau` bounds, `ThreeTypeSpec`, 1-Item / Chain / Star Bridges, `exists_threeTypeSpec`, `exists_efx_three_agent_types_bivalued` |
-| [PROOF.md](PROOF.md) | — | Self-contained human-readable mathematical proof companion |
-| **Total Lean Code** | **7184** | **0 errors, 0 warnings, 0 `sorry`** |
+## Repository structure
 
-## Building and Verification
+| File | Contents |
+|---|---|
+| [BivaluedChoresEFX.lean](BivaluedChoresEFX.lean) | Root module re-exporting the seven modules below |
+| [Basic.lean](BivaluedChoresEFX/Basic.lean) | Bundles, additive costs, `IsEFX`, scaling, reindexing, and realization of prescribed counts |
+| [Reductions.lean](BivaluedChoresEFX/Reductions.lean) | All-large rounds, rotation of cheapest bundles, and all-small insertion |
+| [IdenticalAgents.lean](BivaluedChoresEFX/IdenticalAgents.lean) | Water-filling formulas, internal EFX, and bounds on thresholds and bundle sizes |
+| [TwoAgentTypes.lean](BivaluedChoresEFX/TwoAgentTypes.lean) | Discrete crossing, `TwoTypeSpec`, the single-item bridge, and the two-type theorem |
+| [RatioTwoChores.lean](BivaluedChoresEFX/RatioTwoChores.lean) | PRFRR, the bound by two distinct chores, and the ratio-two corollaries |
+| [Sperner2D.lean](BivaluedChoresEFX/Sperner2D.lean) | Parity proof of the two-dimensional discrete Sperner lemma |
+| [ThreeAgentTypes.lean](BivaluedChoresEFX/ThreeAgentTypes.lean) | Pile bounds, `ThreeTypeSpec`, rainbow triangle cases, bridges, and C2 |
 
-Requires Lean `v4.36.0` (pinned in [lean-toolchain](lean-toolchain)) and Mathlib `v4.36.0` (pinned in [lakefile.toml](lakefile.toml) and [lake-manifest.json](lake-manifest.json)).
+## Building and verification
+
+The project pins Lean and Mathlib to `v4.36.0`. Run the build from the repository root. The `--wfail` option treats build warnings as failures. [Lean toolchain](lean-toolchain) · [Lake configuration](lakefile.toml) · [Dependency manifest](lake-manifest.json)
 
 ```bash
-lake exe cache get   # optional: fetch prebuilt Mathlib oleans
-lake build
+lake exe cache get   # optional, fetch prebuilt Mathlib files
+lake --wfail build
 ```
 
-### Verification Summary
+The eight project modules pass this build. Each declaration below depends only on `propext`, `Classical.choice`, and `Quot.sound`. Reproduce the axiom check through the root module after building.
 
-- **Fresh clean build**: all 8 Lean targets (`Basic`, `Sperner2D`, `RatioTwoChores`, `Reductions`, `IdenticalAgents`, `TwoAgentTypes`, `ThreeAgentTypes`, `BivaluedChoresEFX`) compile cleanly with **0 errors**, **0 warnings**, and **0 `sorry`** (`Build completed successfully (6386 jobs)`).
-- **Complete Axiom Audit** (`#print axioms`):
-
-```lean
-'BivaluedChoresEFX.exists_efx_ratio_le_two' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.exists_efx_bivalued_ratio_le_two' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.exists_efx_three_agent_types_bivalued' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.exists_threeTypeSpec' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.sperner_2d' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.exists_efx_two_agent_types_bivalued' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.exists_efx_identical_bivalued_norm' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.efx_add_all_large_round' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.exists_efx_insert_all_small' depends on axioms: [propext, Classical.choice, Quot.sound]
-'BivaluedChoresEFX.exists_efx_extend_all_small' depends on axioms: [propext, Classical.choice, Quot.sound]
+```bash
+lake env lean --stdin <<'LEAN'
+import BivaluedChoresEFX
+open BivaluedChoresEFX
+#print axioms exists_efx_of_cost_le_sum_of_two
+#print axioms exists_efx_ratio_le_two
+#print axioms exists_efx_bivalued_ratio_le_two
+#print axioms exists_efx_two_agent_types_bivalued
+#print axioms exists_twoTypeSpec
+#print axioms exists_efx_identical_bivalued_norm
+#print axioms exists_efx_three_agent_types_bivalued
+#print axioms exists_threeTypeSpec
+#print axioms sperner_2d
+#print axioms efx_add_all_large_round
+#print axioms exists_efx_with_envy_free_agent
+#print axioms exists_efx_insert_all_small
+#print axioms exists_efx_extend_all_small
+LEAN
 ```

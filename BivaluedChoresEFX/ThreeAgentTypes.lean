@@ -7,31 +7,23 @@ public import BivaluedChoresEFX.Sperner2D
 /-!
 # EFX Existence for Three-Agent-Type Personalized Bi-Valued Chores (2D Sperner + Chain/Star Bridge)
 
-This module proves **Theorem C2 (`exists_efx_three_agent_types_bivalued`)**:
-for **every** `n ≥ 1`, **every** `m ≥ 0`, every 3-type agent partition `cls : Fin n → Fin 3`,
-and every personalized bi-valued additive chores instance `cost i g = v (cls i) g ∈ {p b, q b}`
-(`0 < p b < q b`, arbitrary personalized ratios `r_b = q_b / p_b > 1`) in which every chore is
-all-large (`A`), all-small (`D`), or small for a unique agent type (`B_0, B_1, B_2`), a complete
-exact EFX allocation always exists.
+Theorem C2 (`exists_efx_three_agent_types_bivalued`) gives a complete EFX allocation
+for `n ≥ 1` agents with three type labels. Each type `b` assigns costs in `{p b, q b}`
+with `0 < p b ≤ q b`. An item has cost `p b` for zero, one, or all three types. A type
+may be empty or assign a constant cost to all chores.
 
-## Proof Architecture
-1. **Single-Pile Monotonicity in `p` (`pileTau_mono_p`)**:
-   `pileTau t p s K r ≤ pileTau t (p + 1) s K r`.
-2. **Unified Total-Chore Simplex `Σ`** (`m₀ + m₁ + m₂ = nA + nB₀ + nB₁ + nB₂`) with
-   **Conservative Envy Predicate `Ehat_b`**:
-   * Case A (`nB_b ≤ m_b`): `tildeTau_b = pileTau_b / r_b` (exact).
-   * Case B (`m_b < nB_b`): `tildeTau_b = pileTau(0, m_b)` (conservative).
-   * Automatic Sperner boundary: `m_b = 0 → tildeTau_b = 0 → ¬ Ehat_b` (zero boundary walk!).
-3. **2D Discrete Sperner's Lemma (`sperner_2d`) + Exact Rainbow Rigidity**:
-   * No rainbow down-triangle.
-   * No non-identity rainbow up-triangle (all 5 non-identity permutations ruled out).
-4. **Closed-Form Resolution of Identity Rainbow Up-Triangles**:
-   * **Subcase 4a (`M₀ = M₁ < M₂`)**: tie-breaking + Lemma A bounds `tildeTau₂(m₂) < M₀ + 1`;
-     holding Pile 2 fixed and running the 2-type bridge between Piles 0 and 1 yields EFX.
-   * **Subcase 4b (`M₀ = M₁ = M₂ = M*`)**: all 3 types are in Case A; classifying each type as
-     EASY (`tau(a+1, nB-1) ≤ r*M* + 1`) or HARD (implies `L_max ≥ M* + 2` by Lemma C, `nB ≥ 2`,
-     and `M(a+1, nB-2) ≥ M* + 1` by Lemma B) resolves every triangle via either the
-     **2-Step Chain Bridge** (`≤ 2` HARD types) or the **2-Spoke Star Bridge** (3 HARD types).
+## Proof architecture
+
+1. `pileTau_mono_p` bounds the change of a pile's threshold when its large-item count grows.
+2. A vertex of the triangular grid specifies the number of chores in each of the three piles.
+   The conservative threshold `tildeTau` vanishes at an empty pile, giving Sperner's
+   boundary condition. A grid point passing all three cross-pile tests already gives EFX.
+3. Otherwise `sperner_2d` supplies a rainbow triangle. For an up-triangle, the bounds exclude
+   the five nonidentity color permutations. For a down-triangle they exclude the identity
+   permutation and reduce the other five cases to `threeTypeSpec_of_subcase4a`.
+4. In subcase 4a, two piles tie for smallest bundle size. Fix the third pile and use a
+   single-item bridge. In subcase 4b all three piles tie. The threshold tests give a
+   two-step chain bridge if some type is EASY, and a two-spoke star bridge if all are HARD.
 -/
 
 @[expose] public section
@@ -2635,10 +2627,8 @@ lemma realize_threeTypeSpec {t0 t1 t2 nA nB0 nB1 nB2 : ℕ} {r0 r1 r2 : ℝ}
 /-- **Theorem C2 (EFX Existence for Personalized Bi-Valued Chores with Three Agent Types)**:
 For every `n ≥ 1`, every `m ≥ 0`, every 3-type agent partition `cls : Fin n → Fin 3`,
 and every personalized bi-valued additive chores instance `cost i g = v (cls i) g ∈ {p b, q b}`
-(`0 < p b ≤ q b`, arbitrary personalized ratios `r_b = q_b / p_b > 1`) in which every chore
-is all-large (`A`), all-small (`D`), or small for a unique agent type (`B_0, B_1, B_2`) —
-equivalently, no chore is small for exactly two of the three types — there always exists a
-complete exact EFX allocation. -/
+(`0 < p b ≤ q b`) in which each chore has cost `p b` for zero, one, or all three types,
+there exists a complete exact EFX allocation. -/
 theorem exists_efx_three_agent_types_bivalued
     {n m : ℕ} (hn : 0 < n)
     (cost : Fin n → Fin m → ℝ)

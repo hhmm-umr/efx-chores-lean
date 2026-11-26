@@ -16,9 +16,7 @@ This module defines:
 * `bundleCost cost S i`: agent `i`'s additive disutility for a bundle `S : Finset (Fin m)`.
 * `IsEFX cost alloc`: envy-freeness up to any chore (EFX).
 * Invariance lemmas under positive agent-wise scaling, agent reindexing, and item reindexing.
-* `TwoTypeBundle`: abstract `(nA, nB, nC)` count representation and its realization into a
-  concrete allocation `Fin m → Fin n` for normalized two-agent-type instances without all-small
-  chores.
+* `exists_assignment_with_counts` realizes prescribed bundle sizes that sum to the chore count.
 -/
 
 @[expose] public section

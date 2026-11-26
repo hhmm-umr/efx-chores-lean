@@ -3,20 +3,21 @@ module
 public import BivaluedChoresEFX.Basic
 public import Mathlib.Data.Fintype.Card
 public import Mathlib.Data.Finset.Max
+import Mathlib.Order.Preorder.Finite
 
 /-!
 # General-n Reductions for Additive Chores (Arbitrary Agent Types)
 
 This module formalizes two general-`n` theorems that hold for **arbitrary** numbers of agents `n`
-and **arbitrary** additive disutilities (not restricted to two agent types):
+and nonnegative additive disutilities:
 
 1. **Modulo-`n` All-Large Reduction (`efx_add_all_large_round`)**: Adding `n` chores that each
    achieve agent `i`'s maximum disutility (one chore per agent) preserves EFX.
 2. **All-Small Chore Insertion Lemma (`exists_efx_insert_all_small`,
    `exists_efx_extend_all_small`)**: Given an EFX allocation on a subset of chores, any number of
    all-small chores (minimum disutility for every agent) can be inserted while preserving EFX.
-   The proof uses a global minimum-social-cost EFX allocation whose most-envy graph is acyclic,
-   hence admits a sink (an envy-free agent) who can safely absorb the new all-small chore.
+   Choose a cheapest bundle for each agent and rotate the bundles on one cycle of these
+   choices. Each agent on that cycle then holds a cheapest bundle and can take the new chore.
 -/
 
 @[expose] public section
@@ -98,7 +99,7 @@ theorem efx_add_all_large_round {n m : ℕ}
 
 end ModuloNReduction
 
-section MostEnvyDAG
+section AllSmallInsertion
 
 /-- Every finite nonempty directed graph with no directed cycles (equivalently, no nonempty
 sequence of edges returning to its start) has a sink (a vertex with no outgoing edges). -/
@@ -117,30 +118,16 @@ lemma exists_sink_of_no_cycle {V : Type*} [Fintype V] [Nonempty V]
   have hwalk_edge : ∀ t : ℕ, E (walk t) (walk (t + 1)) := by
     intro t
     simpa [walk, Function.iterate_succ_apply'] using hstep (walk t)
-  -- By pigeonhole on Fin (Fintype.card V + 1) → V, two indices collide
-  have hnotinj : ¬ Function.Injective (fun t : Fin (Fintype.card V + 1) => walk t.1) := by
-    intro hinj
-    have hcard := Fintype.card_le_of_injective _ hinj
-    simp at hcard
-  unfold Function.Injective at hnotinj
-  push Not at hnotinj
-  rcases hnotinj with ⟨a, b, hab, hne⟩
-  wlog hlt : a.1 < b.1 generalizing a b
-  · have hgt : b.1 < a.1 := by
-      have : a.1 ≠ b.1 := fun heq => hne (Fin.ext heq)
-      omega
-    exact this b a hab.symm hne.symm hgt
-  let k := b.1 - a.1
-  have hk : 0 < k := by omega
-  let p : Fin (k + 1) → V := fun t => walk (a.1 + t.1)
-  have hp_edge : ∀ t : Fin k, E (p t.castSucc) (p t.succ) := by
-    intro t
-    simpa [p, Nat.add_assoc] using hwalk_edge (a.1 + t.1)
+  obtain ⟨a, b, hlt, hab⟩ := Set.finite_univ.exists_lt_map_eq_of_forall_mem
+    (f := walk) (fun _ => Set.mem_univ _)
+  let k := b - a
+  have hk : 0 < k := Nat.sub_pos_of_lt hlt
+  let p (t : Fin (k + 1)) := walk (a + t.val)
+  have hp_edge (t : Fin k) : E (p t.castSucc) (p t.succ) := by
+    simpa [p, Nat.add_assoc] using hwalk_edge (a + t.val)
   have hp_eq : p 0 = p (Fin.last k) := by
-    simp only [p, Fin.val_zero, add_zero, Fin.val_last]
-    have hba : a.1 + k = b.1 := by omega
-    rw [hba]
-    exact hab
+    have hb : a + k = b := by dsimp [k]; omega
+    simpa [p, hb] using hab
   exact hacyc k hk p hp_edge hp_eq
 
 /-- Total social cost of an allocation. -/
@@ -154,8 +141,40 @@ def MostEnvyEdge {n m : ℕ} (cost : Fin n → Fin m → ℝ) (alloc : Fin m →
   bundleCost cost (bundle alloc j) i < bundleCost cost (bundle alloc i) i ∧
   ∀ k : Fin n, bundleCost cost (bundle alloc j) i ≤ bundleCost cost (bundle alloc k) i
 
-/-- Every nonempty set of EFX allocations contains one with an envy-free agent (a sink of the
-most-envy graph), obtained by minimizing total social cost over all EFX allocations. -/
+/-- Follow a map on a finite set until a vertex repeats. Rotating that cycle agrees with
+the map on the cycle and fixes all other vertices. -/
+private lemma exists_cycle_rotation {V : Type*} [Finite V] (f : V → V) (start : V) :
+    ∃ (σ : Equiv.Perm V) (s : V), σ s = f s ∧ ∀ i, σ i = f i ∨ σ i = i := by
+  classical
+  obtain ⟨a, b, hab, hrepeat⟩ := Set.finite_univ.exists_lt_map_eq_of_forall_mem
+    (f := fun k : ℕ => f^[k] start) (fun _ => Set.mem_univ _)
+  let s := f^[a] start
+  have hreturn : f^[b - a] s = s := by
+    change f^[b - a] (f^[a] start) = f^[a] start
+    rw [← Function.iterate_add_apply, Nat.sub_add_cancel hab.le, hrepeat]
+  let orbit := Set.range (fun k : ℕ => f^[k] s)
+  let rotate (i : V) := if i ∈ orbit then f i else i
+  have hsurj : Function.Surjective rotate := by
+    intro i
+    by_cases hi : i ∈ orbit
+    · obtain ⟨k, rfl⟩ := hi
+      -- Moving a full period ends at the same vertex, so its predecessor is in the orbit.
+      let t := k + (b - a - 1)
+      refine ⟨f^[t] s, ?_⟩
+      have ht : f^[t] s ∈ orbit := ⟨t, rfl⟩
+      simp only [rotate, ite_eq_left ht]
+      rw [← Function.iterate_succ_apply' f t s, show t.succ = k + (b - a) by dsimp [t]; omega,
+        Function.iterate_add_apply, hreturn]
+    · exact ⟨i, ite_eq_right hi⟩
+  let σ : Equiv.Perm V := Equiv.ofBijective rotate (Finite.surjective_iff_bijective.mp hsurj)
+  have hs : s ∈ orbit := ⟨0, rfl⟩
+  refine ⟨σ, s, ite_eq_left hs, fun i => ?_⟩
+  by_cases hi : i ∈ orbit
+  · exact Or.inl (ite_eq_left hi)
+  · exact Or.inr (ite_eq_right hi)
+
+/-- Starting from an EFX allocation, one rotation of cheapest bundles yields an EFX
+allocation in which some agent holds a cheapest bundle. -/
 theorem exists_efx_with_envy_free_agent {n m : ℕ} (hn : 0 < n)
     (cost : Fin n → Fin m → ℝ) (hnn : ∀ i g, 0 ≤ cost i g)
     (hex : ∃ alloc : Fin m → Fin n, IsEFX cost alloc) :
@@ -163,220 +182,32 @@ theorem exists_efx_with_envy_free_agent {n m : ℕ} (hn : 0 < n)
       IsEFX cost alloc ∧
       ∀ k : Fin n, bundleCost cost (bundle alloc s) s ≤ bundleCost cost (bundle alloc k) s := by
   classical
-  have : Nonempty (Fin n) := ⟨⟨0, hn⟩⟩
-  let S : Finset (Fin m → Fin n) := Finset.univ.filter (fun a => IsEFX cost a)
-  have hS_ne : S.Nonempty := by
-    rcases hex with ⟨a₀, ha₀⟩
-    exact ⟨a₀, Finset.mem_filter.mpr ⟨Finset.mem_univ _, ha₀⟩⟩
-  obtain ⟨alloc, hmem, hmin⟩ := S.exists_min_image (socialCost cost) hS_ne
-  have hefx : IsEFX cost alloc := (Finset.mem_filter.mp hmem).2
-  -- Show MostEnvyEdge cost alloc has no directed cycle; otherwise rotating a simple cycle
-  -- strictly decreases socialCost while preserving EFX.
-  have hacyc : ∀ (k : ℕ) (hk : 0 < k) (p : Fin (k + 1) → Fin n),
-      (∀ t : Fin k, MostEnvyEdge cost alloc (p t.castSucc) (p t.succ)) →
-      p 0 ≠ p (Fin.last k) := by
-    -- Prove by strong induction on k so we may extract a simple cycle (injective on Fin k)
-    intro k
-    induction k using Nat.strong_induction_on with
-    | ind k ih =>
-      intro hk p hp heq
-      -- Check if p is injective on Fin k (indices 0 .. k-1)
-      by_cases hinj : Function.Injective (fun t : Fin k => p t.castSucc)
-      · -- Simple cycle of length k! Define permutation σ rotating p(t) ↦ p(t+1) (mod k).
-        -- Under the rotated allocation alloc'(g) = σ⁻¹(alloc(g)), agent p(t) receives bundle p(t+1),
-        -- while agents outside the cycle keep their own bundle.
-        let onCyc (i : Fin n) : Prop := ∃ t : Fin k, p t.castSucc = i
-        -- Helper: next vertex on the cycle for t : Fin k
-        let nxt (t : Fin k) : Fin k := ⟨(t.1 + 1) % k, Nat.mod_lt _ hk⟩
-        have hp_nxt : ∀ t : Fin k, p (nxt t).castSucc = p t.succ := by
-          intro t
-          by_cases hlast : t.1 + 1 < k
-          · have hmod : (t.1 + 1) % k = t.1 + 1 := Nat.mod_eq_of_lt hlast
-            congr 1; ext; simpa [nxt] using hmod
-          · have htk : t.1 + 1 = k := by omega
-            have hmod : (t.1 + 1) % k = 0 := by rw [htk, Nat.mod_self]
-            have h1 : (nxt t).castSucc = (0 : Fin (k + 1)) := by ext; simpa [nxt] using hmod
-            have h2 : t.succ = Fin.last k := by ext; simpa using htk
-            rw [h1, h2, heq]
-        -- Helper: previous vertex on the cycle for t : Fin k
-        let prv (t : Fin k) : Fin k := ⟨(t.1 + k - 1) % k, Nat.mod_lt _ hk⟩
-        have hnxt_prv : ∀ t : Fin k, nxt (prv t) = t := by
-          intro t
-          ext
-          simp only [nxt, prv]
-          have ht := t.2
-          by_cases h0 : t.1 = 0
-          · have h1 : (0 + k - 1) % k = k - 1 := by
-              rw [zero_add]
-              exact Nat.mod_eq_of_lt (by omega)
-            rw [h0, h1]
-            have : k - 1 + 1 = k := by omega
-            rw [this, Nat.mod_self]
-          · have h1 : (t.1 + k - 1) % k = t.1 - 1 := by
-              have : t.1 + k - 1 = (t.1 - 1) + k := by omega
-              rw [this, Nat.add_mod_right, Nat.mod_eq_of_lt (by omega)]
-            rw [h1]
-            have : t.1 - 1 + 1 = t.1 := by omega
-            rw [this, Nat.mod_eq_of_lt ht]
-        have hprv_nxt : ∀ t : Fin k, prv (nxt t) = t := by
-          intro t
-          ext
-          simp only [nxt, prv]
-          have ht := t.2
-          by_cases hlast : t.1 + 1 < k
-          · rw [Nat.mod_eq_of_lt hlast]
-            have : t.1 + 1 + k - 1 = t.1 + k := by omega
-            rw [this, Nat.add_mod_right, Nat.mod_eq_of_lt ht]
-          · have htk : t.1 + 1 = k := by omega
-            rw [htk, Nat.mod_self, zero_add]
-            rw [Nat.mod_eq_of_lt (by omega)]
-            omega
-        -- Build bijection σ : Fin n ≃ Fin n with σ (p t.castSucc) = p t.succ and σ i = i off cycle
-        let toFun (i : Fin n) : Fin n :=
-          if h : ∃ t : Fin k, p t.castSucc = i then
-            p (nxt h.choose).castSucc
-          else i
-        let invFun (i : Fin n) : Fin n :=
-          if h : ∃ t : Fin k, p t.castSucc = i then
-            p (prv h.choose).castSucc
-          else i
-        have hto_cyc : ∀ t : Fin k, toFun (p t.castSucc) = p (nxt t).castSucc := by
-          intro t
-          have h : ∃ s : Fin k, p s.castSucc = p t.castSucc := ⟨t, rfl⟩
-          simp only [toFun, dite_eq_left h]
-          have hch : h.choose = t := hinj h.choose_spec
-          rw [hch]
-        have hinv_cyc : ∀ t : Fin k, invFun (p t.castSucc) = p (prv t).castSucc := by
-          intro t
-          have h : ∃ s : Fin k, p s.castSucc = p t.castSucc := ⟨t, rfl⟩
-          simp only [invFun, dite_eq_left h]
-          have hch : h.choose = t := hinj h.choose_spec
-          rw [hch]
-        have hleft : Function.LeftInverse invFun toFun := by
-          intro i
-          by_cases h : ∃ t : Fin k, p t.castSucc = i
-          · rcases h with ⟨t, rfl⟩
-            rw [hto_cyc t, hinv_cyc (nxt t), hprv_nxt t]
-          · simp only [toFun, invFun, dite_eq_right h]
-        have hright : Function.RightInverse invFun toFun := by
-          intro i
-          by_cases h : ∃ t : Fin k, p t.castSucc = i
-          · rcases h with ⟨t, rfl⟩
-            rw [hinv_cyc t, hto_cyc (prv t), hnxt_prv t]
-          · simp only [invFun, toFun, dite_eq_right h]
-        let σ : Fin n ≃ Fin n := ⟨toFun, invFun, hleft, hright⟩
-        -- Define rotated allocation: agent i receives old bundle (σ i)
-        let alloc' : Fin m → Fin n := fun g => σ.symm (alloc g)
-        have hbundle' : ∀ i : Fin n, bundle alloc' i = bundle alloc (σ i) := by
-          intro i
-          ext g
-          simp [alloc', bundle, Equiv.symm_apply_eq]
-        -- 1) alloc' is still EFX!
-        have hefx' : IsEFX cost alloc' := by
-          intro i j g hg
-          rw [hbundle' i] at hg ⊢
-          rw [hbundle' j]
-          by_cases h : ∃ t : Fin k, p t.castSucc = i
-          · rcases h with ⟨t, rfl⟩
-            have hσt : σ (p t.castSucc) = p t.succ := by
-              change toFun (p t.castSucc) = p t.succ
-              rw [hto_cyc t, hp_nxt t]
-            rw [hσt] at hg ⊢
-            have hmin_t := (hp t).2 (σ j)
-            rw [bundleCost_sdiff_singleton cost hg]
-            linarith [hnn (p t.castSucc) g]
-          · have hσi : σ i = i := by
-              change toFun i = i
-              simp [toFun, dite_eq_right h]
-            rw [hσi] at hg ⊢
-            exact hefx i (σ j) g hg
-        -- 2) alloc' has STRICTLY SMALLER socialCost than alloc!
-        have hsc_lt : socialCost cost alloc' < socialCost cost alloc := by
-          unfold socialCost
-          apply Finset.sum_lt_sum
-          · intro i _
-            rw [hbundle' i]
-            by_cases h : ∃ t : Fin k, p t.castSucc = i
-            · rcases h with ⟨t, rfl⟩
-              have hσt : σ (p t.castSucc) = p t.succ := by
-                change toFun (p t.castSucc) = p t.succ
-                rw [hto_cyc t, hp_nxt t]
-              rw [hσt]
-              exact le_of_lt (hp t).1
-            · have hσi : σ i = i := by
-                change toFun i = i
-                simp [toFun, dite_eq_right h]
-              rw [hσi]
-          · refine ⟨p (⟨0, hk⟩ : Fin k).castSucc, Finset.mem_univ _, ?_⟩
-            rw [hbundle']
-            have hσ0 : σ (p (⟨0, hk⟩ : Fin k).castSucc) = p (⟨0, hk⟩ : Fin k).succ := by
-              change toFun _ = _
-              rw [hto_cyc ⟨0, hk⟩, hp_nxt ⟨0, hk⟩]
-            rw [hσ0]
-            exact (hp ⟨0, hk⟩).1
-        -- Contradiction with minimality of alloc!
-        have hmem' : alloc' ∈ S := Finset.mem_filter.mpr ⟨Finset.mem_univ _, hefx'⟩
-        linarith [hmin alloc' hmem']
-      · -- Not injective on Fin k: extract a strictly shorter cycle and apply IH!
-        unfold Function.Injective at hinj
-        push Not at hinj
-        rcases hinj with ⟨a, b, hab, hne⟩
-        have hne_val : a.1 ≠ b.1 := fun h => hne (Fin.ext h)
-        rcases lt_or_gt_of_ne hne_val with hlt | hgt
-        · let k' := b.1 - a.1
-          have hk'_pos : 0 < k' := by omega
-          have hk'_lt : k' < k := by omega
-          let p' : Fin (k' + 1) → Fin n := fun t => p ⟨a.1 + t.1, by omega⟩
-          have hp' : ∀ t : Fin k', MostEnvyEdge cost alloc (p' t.castSucc) (p' t.succ) := by
-            intro t
-            have ht_lt : a.1 + t.1 < k := by omega
-            have hstep := hp ⟨a.1 + t.1, ht_lt⟩
-            have h1 : (⟨a.1 + t.1, ht_lt⟩ : Fin k).castSucc = ⟨a.1 + t.castSucc.1, by omega⟩ := by
-              ext; simp
-            have h2 : (⟨a.1 + t.1, ht_lt⟩ : Fin k).succ = ⟨a.1 + t.succ.1, by omega⟩ := by
-              ext; simp; omega
-            simpa [p', h1, h2] using hstep
-          have heq' : p' 0 = p' (Fin.last k') := by
-            change p ⟨a.1 + 0, _⟩ = p ⟨a.1 + k', _⟩
-            have h1 : (⟨a.1 + 0, by omega⟩ : Fin (k + 1)) = a.castSucc := by ext; simp
-            have h2 : (⟨a.1 + k', by omega⟩ : Fin (k + 1)) = b.castSucc := by
-              ext; simp [k']; omega
-            rw [h1, h2]
-            exact hab
-          exact ih k' hk'_lt hk'_pos p' hp' heq'
-        · let k' := a.1 - b.1
-          have hk'_pos : 0 < k' := by omega
-          have hk'_lt : k' < k := by omega
-          let p' : Fin (k' + 1) → Fin n := fun t => p ⟨b.1 + t.1, by omega⟩
-          have hp' : ∀ t : Fin k', MostEnvyEdge cost alloc (p' t.castSucc) (p' t.succ) := by
-            intro t
-            have ht_lt : b.1 + t.1 < k := by omega
-            have hstep := hp ⟨b.1 + t.1, ht_lt⟩
-            have h1 : (⟨b.1 + t.1, ht_lt⟩ : Fin k).castSucc = ⟨b.1 + t.castSucc.1, by omega⟩ := by
-              ext; simp
-            have h2 : (⟨b.1 + t.1, ht_lt⟩ : Fin k).succ = ⟨b.1 + t.succ.1, by omega⟩ := by
-              ext; simp; omega
-            simpa [p', h1, h2] using hstep
-          have heq' : p' 0 = p' (Fin.last k') := by
-            change p ⟨b.1 + 0, _⟩ = p ⟨b.1 + k', _⟩
-            have h1 : (⟨b.1 + 0, by omega⟩ : Fin (k + 1)) = b.castSucc := by ext; simp
-            have h2 : (⟨b.1 + k', by omega⟩ : Fin (k + 1)) = a.castSucc := by
-              ext; simp [k']; omega
-            rw [h1, h2]
-            exact hab.symm
-          exact ih k' hk'_lt hk'_pos p' hp' heq'
-  -- Obtain a sink s of the acyclic MostEnvyEdge graph
-  obtain ⟨s, hs⟩ := exists_sink_of_no_cycle (MostEnvyEdge cost alloc) hacyc
-  refine ⟨alloc, s, hefx, ?_⟩
-  -- Since s has no outgoing MostEnvyEdge, s's own bundle achieves min_k c_s(X_k)!
-  obtain ⟨j₀, _, hj₀⟩ := (Finset.univ : Finset (Fin n)).exists_min_image
-    (fun k => bundleCost cost (bundle alloc k) s) Finset.univ_nonempty
-  have hnot : ¬ bundleCost cost (bundle alloc j₀) s < bundleCost cost (bundle alloc s) s := by
-    intro hlt
-    exact hs j₀ ⟨hlt, fun k => hj₀ k (Finset.mem_univ k)⟩
-  push Not at hnot
-  intro k
-  exact le_trans hnot (hj₀ k (Finset.mem_univ k))
+  let start : Fin n := ⟨0, hn⟩
+  have : Nonempty (Fin n) := ⟨start⟩
+  obtain ⟨alloc, hefx⟩ := hex
+  have cheapest (i : Fin n) : ∃ j, ∀ k : Fin n,
+      bundleCost cost (bundle alloc j) i ≤ bundleCost cost (bundle alloc k) i := by
+    obtain ⟨j, _, hj⟩ := Finset.univ.exists_min_image
+      (fun k => bundleCost cost (bundle alloc k) i) Finset.univ_nonempty
+    exact ⟨j, fun k => hj k (Finset.mem_univ k)⟩
+  choose best hbest using cheapest
+  obtain ⟨σ, s, hs, hσ⟩ := exists_cycle_rotation best start
+  let rotated (g : Fin m) := σ.symm (alloc g)
+  have hbundle (i : Fin n) : bundle rotated i = bundle alloc (σ i) := by
+    ext g
+    simp [rotated, bundle, Equiv.symm_apply_eq]
+  refine ⟨rotated, s, ?_, ?_⟩
+  · intro i j g hg
+    rw [hbundle i] at hg ⊢
+    rw [hbundle j]
+    rcases hσ i with h | h
+    · rw [bundleCost_sdiff_singleton cost hg, h]
+      exact (sub_le_self _ (hnn i g)).trans (hbest i (σ j))
+    · rw [h] at hg ⊢
+      exact hefx i (σ j) g hg
+  · intro j
+    rw [hbundle s, hs, hbundle j]
+    exact hbest s (σ j)
 
 /-- **Single All-Small Chore Insertion Lemma**: If `cost` on `m + 1` chores admits an EFX allocation
 on the first `m` chores, and the last chore `Fin.last m` has minimal disutility for every agent
@@ -478,6 +309,6 @@ theorem exists_efx_extend_all_small {n m d : ℕ} (hn : 0 < n)
     rw [hlast]
     exact hsmall i (Fin.last d) g
 
-end MostEnvyDAG
+end AllSmallInsertion
 
 end BivaluedChoresEFX

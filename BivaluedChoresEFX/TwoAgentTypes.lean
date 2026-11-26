@@ -13,9 +13,9 @@ instance with two types of agents (`T₁` with costs `{p₁, q₁}` and `T₂` w
 `0 < p_b ≤ q_b`), there always exists a complete EFX allocation.
 
 ## Proof Architecture
-1. **Normalization**: scale each type by `1 / p_b > 0` so costs lie in `{1, r_b}` with `1 < r_b`.
-2. **Degenerate single-type cases** (`t₁ = 0` or `t₂ = 0`): solved directly by `IdenticalEFX`
-   (`exists_efx_identical_bivalued`).
+1. Scale each type by `1 / p_b`. For a constant type all normalized costs are `1` and we use
+   `2` as an unused upper value. The pile lemmas then apply with `r_b > 1` throughout.
+2. If one type is empty, apply `exists_efx_identical_bivalued_norm` to the other type.
 3. **Partitioning chores** into `A` (all-large), `B` (small for `T₁`, large for `T₂`),
    `C` (large for `T₁`, small for `T₂`), and `D` (all-small).
 4. **Discrete Bolzano Walk + Phase-2 Single-Item Bridge** (`exists_twoTypeSpec`):

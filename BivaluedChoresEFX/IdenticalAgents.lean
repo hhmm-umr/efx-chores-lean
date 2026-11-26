@@ -5,8 +5,8 @@ public import BivaluedChoresEFX.Basic
 /-!
 # Closed-Form Identical-Agent EFX Allocation and Structural Bounds
 
-This module defines the closed-form water-filling allocation `identicalPile` for `t ≥ 1`
-identical agents with bi-valued chore costs `{1, r}` (`1 < r`, `K = ⌈r⌉`), and proves:
+The functions `pileLarge` and `pileSmall` give the counts in the water-filling allocation
+for `t ≥ 1` identical agents with costs `{1, r}` (`1 < r`, `K = ⌈r⌉`).
 
 1. **Sum identities**: total large items = `p`, total small items = `s`.
 2. **Internal EFX (`identicalPile_internal_efx`)**: every pair of agents in the pile is EFX.
